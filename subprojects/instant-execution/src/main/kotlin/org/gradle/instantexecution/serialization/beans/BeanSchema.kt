@@ -18,12 +18,19 @@ package org.gradle.instantexecution.serialization.beans
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.Task
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.internal.AbstractTask
 import org.gradle.api.internal.ConventionTask
 import org.gradle.api.internal.TaskInternal
 
 import java.lang.reflect.Field
 import java.lang.reflect.Modifier
+
+
+internal
+val unsupportedFieldDeclaredTypes = listOf(
+    Configuration::class
+)
 
 
 internal
