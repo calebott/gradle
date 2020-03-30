@@ -556,34 +556,33 @@ public class TestFile extends File {
     }
 
     /**
-     * Asserts that this file contains exactly the given set of descendants.
+     * Asserts that this is a directory and contains exactly the given set of descendant files and child directories. Ignores directories that are not empty.
      */
     public TestFile assertHasDescendants(String... descendants) {
         return assertHasDescendants(Arrays.asList(descendants));
     }
 
     /**
-     * Convenience method for {@link #assertHasDescendants(String...)}.
+     * Asserts that this is a directory and contains exactly the given set of descendant files and child directories. Ignores directories that are not empty.
      */
     public TestFile assertHasDescendants(Iterable<String> descendants) {
         Set<String> actual = new TreeSet<String>();
         assertIsDir();
         visit(actual, "", this);
-        Set<String> expected = new TreeSet<String>(Lists.<String>newArrayList(descendants));
+        Set<String> expected = new TreeSet<>(Lists.newArrayList(descendants));
 
-        Set<String> extras = new TreeSet<String>(actual);
+        Set<String> extras = new TreeSet<>(actual);
         extras.removeAll(expected);
-        Set<String> missing = new TreeSet<String>(expected);
+        Set<String> missing = new TreeSet<>(expected);
         missing.removeAll(actual);
 
         assertEquals(String.format("For dir: %s\n extra files: %s, missing files: %s, expected: %s", this, extras, missing, expected), expected, actual);
 
         return this;
-
     }
 
     /**
-     * Convenience method for {@link #assertContainsDescendants(String...)}.
+     * Asserts that this is a directory and contains the given set of descendant files and child directories (and possibly other files). Ignores directories that are not empty.
      */
     public TestFile assertContainsDescendants(Iterable<String> descendants) {
         assertIsDir();
@@ -601,14 +600,13 @@ public class TestFile extends File {
     }
 
     /**
-     * Asserts that this file contains the given set of descendants (and possibly other files).
+     * Asserts that this is a directory and contains the given set of descendant files (and possibly other files). Ignores directories that are not empty.
      */
     public TestFile assertContainsDescendants(String... descendants) {
         return assertContainsDescendants(Arrays.asList(descendants));
     }
 
     public TestFile assertIsEmptyDir() {
-        assertIsDir();
         assertHasDescendants();
         return this;
     }
@@ -623,7 +621,7 @@ public class TestFile extends File {
 
     private void visit(Set<String> names, String prefix, File file) {
         for (File child : file.listFiles()) {
-            if (child.isFile()) {
+            if (child.isFile() || child.isDirectory() && child.list().length == 0) {
                 names.add(prefix + child.getName());
             } else if (child.isDirectory()) {
                 visit(names, prefix + child.getName() + "/", child);
