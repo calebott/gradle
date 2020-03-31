@@ -266,6 +266,7 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
                 invalidateAll();
             } finally {
                 watchRegistry = null;
+                fileEvents.clear();
             }
         });
     }
