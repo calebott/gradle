@@ -258,13 +258,13 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
                 fileWatcherRegistry.close();
             } catch (IOException ex) {
                 LOGGER.error("Couldn't fetch file changes, dropping VFS state", ex);
-                invalidateAll();
+                getRoot().updateAndGet(SnapshotHierarchy::empty);
             } finally {
                 watchRegistry = null;
                 fileEvents.clear();
             }
         });
-        invalidateAll();
+        getRoot().updateAndGet(SnapshotHierarchy::empty);
     }
 
     private void handleWatcherRegistryEvents(String eventsFor) {
