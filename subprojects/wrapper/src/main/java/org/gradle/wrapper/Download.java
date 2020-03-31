@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.Authenticator;
+import java.net.HttpURLConnection;
 import java.net.PasswordAuthentication;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -75,6 +76,11 @@ public class Download implements IDownload {
             addBasicAuthentication(address, conn);
             final String userAgentValue = calculateUserAgent();
             conn.setRequestProperty("User-Agent", userAgentValue);
+            conn.setRequestProperty("Accept", "application/octet-stream");
+
+            // check for redirects
+            conn = checkForRedirect(conn);
+
             in = conn.getInputStream();
             byte[] buffer = new byte[BUFFER_SIZE];
             int numRead;
@@ -106,6 +112,45 @@ public class Download implements IDownload {
                 out.close();
             }
         }
+    }
+
+    /**
+     * Checks for redirects in the response and follows the redirects without propagating headers from the original request.
+     * @param originalConnection
+     *  The connection to check for redirects
+     * @return
+     *  The connection after any/all redirects have been resolved
+     * @throws Exception
+     *  Propagates exceptions for caller to handle
+     */
+    private URLConnection checkForRedirect(URLConnection originalConnection) throws Exception {
+        URLConnection result = originalConnection;
+
+        // only check if we are using a HttpURLConnection
+        if (originalConnection instanceof HttpURLConnection) {
+
+            HttpURLConnection conn = (HttpURLConnection) originalConnection;
+
+            // shut off normal following of redirects
+            conn.setInstanceFollowRedirects(false);
+
+            int status = conn.getResponseCode();
+
+            // normally, 3xx is redirect
+            if (String.valueOf(status).startsWith("3")) {
+
+                // get redirect url from "location" header field
+                String newUrl = conn.getHeaderField("Location");
+
+                // open the new connnection again
+                URLConnection newConn = new URL(newUrl).openConnection();
+
+                // recurse to check for more redirects
+                result = checkForRedirect(newConn);
+            }
+        }
+
+        return result;
     }
 
     /**
