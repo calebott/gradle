@@ -597,6 +597,24 @@ class VirtualFileSystemRetentionIntegrationTest extends AbstractIntegrationSpec 
         failureHasCause("Boom")
     }
 
+    def "root project dir does not need to exist"() {
+        def settingsDir = file("gradle");
+        def settingsFile = settingsDir.file("settings.gradle");
+        settingsFile << """
+            rootProject.projectDir = new File(settingsDir, '../root')
+            include 'sub'
+            project(':sub').projectDir = new File(settingsDir, '../sub')
+        """
+        file("sub/build.gradle") << "task thing"
+
+        when:
+        inDirectory(settingsDir)
+        run("thing")
+        then:
+        executed ":sub:thing"
+
+    }
+
     @Issue("https://github.com/gradle/gradle/issues/11851")
     @Requires(TestPrecondition.SYMLINKS)
     def "gracefully handle when watching the same path via symlinks"() {
