@@ -17,6 +17,7 @@
 package org.gradle.internal.vfs.impl
 
 import org.gradle.internal.snapshot.CaseSensitivity
+import org.gradle.internal.vfs.SnapshotHierarchy
 import org.gradle.internal.vfs.watch.FileWatcherRegistry
 import org.gradle.internal.vfs.watch.FileWatcherRegistryFactory
 import spock.lang.Specification
@@ -28,6 +29,8 @@ class WatchingVirtualFileSystemTest extends Specification {
     def watcherRegistryFactory = Mock(FileWatcherRegistryFactory)
     def watcherRegistry = Mock(FileWatcherRegistry)
     def listenerRegistration = Mock(WatchingVirtualFileSystem.ListenerRegistration)
+    def rootHierarchy = Mock(SnapshotHierarchy)
+    def rootReference = new AtomicReference(rootHierarchy)
     def watchingVirtualFileSystem = new WatchingVirtualFileSystem(watcherRegistryFactory, delegate, listenerRegistration, { -> true })
     def snapshotHierarchy = DefaultSnapshotHierarchy.empty(CaseSensitivity.CASE_SENSITIVE)
 
@@ -35,7 +38,8 @@ class WatchingVirtualFileSystemTest extends Specification {
         when:
         watchingVirtualFileSystem.afterStart(false)
         then:
-        1 * delegate.invalidateAll()
+        1 * delegate.root >> rootReference
+        1 * rootHierarchy.empty()
         0 * _
 
         when:
@@ -65,7 +69,8 @@ class WatchingVirtualFileSystemTest extends Specification {
         when:
         watchingVirtualFileSystem.afterStart(false)
         then:
-        1 * delegate.invalidateAll()
+        1 * delegate.root >> rootReference
+        1 * rootHierarchy.empty()
         1 * watcherRegistry.close()
         1 * listenerRegistration.removeListener(_)
         0 * _
