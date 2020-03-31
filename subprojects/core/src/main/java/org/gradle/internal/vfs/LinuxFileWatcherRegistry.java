@@ -19,7 +19,6 @@ package org.gradle.internal.vfs;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multiset;
-import com.google.common.util.concurrent.AtomicLongMap;
 import net.rubygrapefruit.platform.Native;
 import net.rubygrapefruit.platform.NativeException;
 import net.rubygrapefruit.platform.internal.jni.LinuxFileEventFunctions;
@@ -60,18 +59,18 @@ public class LinuxFileWatcherRegistry extends AbstractEventDrivenFileWatcherRegi
 
     @Override
     protected void handleChanges(Collection<CompleteFileSystemLocationSnapshot> removedSnapshots, Collection<CompleteFileSystemLocationSnapshot> addedSnapshots) {
-        AtomicLongMap<String> changedWatchedDirectories = AtomicLongMap.create();
+        Map<String, Integer> changedWatchedDirectories = new HashMap<>();
 
         removedSnapshots.forEach(snapshot -> {
             ImmutableList<String> previousWatchedRoots = watchedRootsForSnapshot.remove(snapshot.getAbsolutePath());
-            previousWatchedRoots.forEach(changedWatchedDirectories::decrementAndGet);
+            previousWatchedRoots.forEach(path -> decrement(path, changedWatchedDirectories));
             snapshot.accept(new FileSystemSnapshotVisitor() {
                 boolean root = true;
 
                 @Override
                 public boolean preVisitDirectory(CompleteDirectorySnapshot directorySnapshot) {
                     if (!root) {
-                        changedWatchedDirectories.decrementAndGet(directorySnapshot.getAbsolutePath());
+                        decrement(directorySnapshot.getAbsolutePath(), changedWatchedDirectories);
                     }
                     root = false;
                     return true;
@@ -91,14 +90,14 @@ public class LinuxFileWatcherRegistry extends AbstractEventDrivenFileWatcherRegi
             ImmutableList<String> directoriesToWatchForRoot = ImmutableList.copyOf(WatchRootUtil.getDirectoriesToWatch(snapshot).stream()
                 .map(Path::toString).collect(Collectors.toList()));
             watchedRootsForSnapshot.put(snapshot.getAbsolutePath(), directoriesToWatchForRoot);
-            directoriesToWatchForRoot.forEach(changedWatchedDirectories::incrementAndGet);
+            directoriesToWatchForRoot.forEach(path -> increment(path, changedWatchedDirectories));
             snapshot.accept(new FileSystemSnapshotVisitor() {
                 boolean root = true;
 
                 @Override
                 public boolean preVisitDirectory(CompleteDirectorySnapshot directorySnapshot) {
                     if (!root) {
-                        changedWatchedDirectories.incrementAndGet(directorySnapshot.getAbsolutePath());
+                        increment(directorySnapshot.getAbsolutePath(), changedWatchedDirectories);
                     }
                     root = false;
                     return true;
@@ -119,27 +118,26 @@ public class LinuxFileWatcherRegistry extends AbstractEventDrivenFileWatcherRegi
 
     @Override
     public void updateMustWatchDirectories(Collection<File> updatedWatchDirectories) {
-        AtomicLongMap<String> changedDirectories = AtomicLongMap.create();
-        mustWatchDirectories.forEach(changedDirectories::decrementAndGet);
+        Map<String, Integer> changedDirectories = new HashMap<>();
+        mustWatchDirectories.forEach(path -> decrement(path, changedDirectories));
         mustWatchDirectories.clear();
         updatedWatchDirectories.stream()
             .filter(File::isDirectory)
             .map(File::getAbsolutePath)
             .forEach(mustWatchDirectories::add);
-        mustWatchDirectories.forEach(changedDirectories::incrementAndGet);
+        mustWatchDirectories.forEach(path -> increment(path, changedDirectories));
         updateWatchedDirectories(changedDirectories);
 
     }
 
-    private void updateWatchedDirectories(AtomicLongMap<String> changedWatchDirectories) {
+    private void updateWatchedDirectories(Map<String, Integer> changedWatchDirectories) {
         if (changedWatchDirectories.isEmpty()) {
             return;
         }
         Set<File> watchRootsToRemove = new HashSet<>();
         Set<File> watchRootsToAdd = new HashSet<>();
-        changedWatchDirectories.asMap().entrySet().forEach(entry -> {
-            String absolutePath = entry.getKey();
-            int count = entry.getValue().intValue();
+        changedWatchDirectories.forEach((absolutePath, value) -> {
+            int count = value;
             if (count < 0) {
                 int toRemove = -count;
                 int contained = watchedRoots.remove(absolutePath, toRemove);
@@ -166,6 +164,14 @@ public class LinuxFileWatcherRegistry extends AbstractEventDrivenFileWatcherRegi
             }
             throw e;
         }
+    }
+
+    private static void decrement(String path, Map<String, Integer> changedWatchedDirectories) {
+        changedWatchedDirectories.compute(path, (key, value) -> value == null ? -1 : value - 1);
+    }
+
+    private static void increment(String path, Map<String, Integer> changedWatchedDirectories) {
+        changedWatchedDirectories.compute(path, (key, value) -> value == null ? 1 : value + 1);
     }
 
     public static class Factory implements FileWatcherRegistryFactory {
