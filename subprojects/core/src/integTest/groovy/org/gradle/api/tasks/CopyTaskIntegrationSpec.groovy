@@ -1324,16 +1324,55 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
         file('dest').assertHasDescendants('one.txt', 'more/more.txt')
     }
 
-    def "copy excludes duplicates"() {
+    def "copy includes duplicates by default and emits deprecation warning when duplicates are present"() {
         given:
-        file('dir1', 'path', 'file.txt').createFile() << "f1"
-        file('dir2', 'path', 'file.txt').createFile() << "f2"
+        file('dir1/path/file.txt').createFile() << 'f1'
+        file('dir2/path/file.txt').createFile() << 'f2'
         buildScript '''
             task copy(type: Copy) {
                 from 'dir1'
                 from 'dir2'
                 into 'dest'
-                eachFile { it.duplicatesStrategy = 'exclude' }
+            }
+        '''.stripIndent()
+
+        when:
+        executer.expectDocumentedDeprecationWarning("Copying or archiving duplicate paths with the default duplicates strategy has been deprecated. This is scheduled to be removed in Gradle 7.0. Duplicate path: \"path/file.txt\". Explicitly set the duplicates strategy to 'DuplicatesStrategy.INCLUDE' if you want to allow duplicate paths. Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_5.html#implicit_duplicate_strategy_for_copy_or_archive_tasks_has_been_deprecated")
+        run 'copy'
+
+        then:
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'f2'
+
+        when:
+        run 'copy'
+
+        then:
+        skipped(':copy')
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'f2'
+
+        when:
+        file('dir2/path/file.txt').text = 'new'
+        executer.expectDocumentedDeprecationWarning("Copying or archiving duplicate paths with the default duplicates strategy has been deprecated. This is scheduled to be removed in Gradle 7.0. Duplicate path: \"path/file.txt\". Explicitly set the duplicates strategy to 'DuplicatesStrategy.INCLUDE' if you want to allow duplicate paths. Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_5.html#implicit_duplicate_strategy_for_copy_or_archive_tasks_has_been_deprecated")
+        run 'copy'
+
+        then:
+        executedAndNotSkipped(':copy')
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'new'
+    }
+
+    def "copy excludes duplicates when flag is set, stopping at first duplicate"() {
+        given:
+        file('dir1/path/file.txt').createFile() << 'f1'
+        file('dir2/path/file.txt').createFile() << 'f2'
+        buildScript '''
+            task copy(type: Copy) {
+                from 'dir1'
+                from 'dir2'
+                into 'dest'
+                duplicatesStrategy = 'exclude'
             }
         '''.stripIndent()
 
@@ -1342,7 +1381,62 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
 
         then:
         file('dest').assertHasDescendants('path/file.txt')
-        file('dest/path/file.txt').assertContents(Matchers.containsText("f1"))
+        file('dest/path/file.txt').text == 'f1'
+
+        when:
+        run 'copy'
+
+        then:
+        skipped(':copy')
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'f1'
+
+        when:
+        file('dir1/path/file.txt').text = 'new'
+        run 'copy'
+
+        then:
+        executedAndNotSkipped(':copy')
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'new'
+    }
+
+    def "copy includes duplicates when flag is set, overwriting each duplicate"() {
+        given:
+        file('dir1/path/file.txt').createFile() << 'f1'
+        file('dir2/path/file.txt').createFile() << 'f2'
+        buildScript '''
+            task copy(type: Copy) {
+                from 'dir1'
+                from 'dir2'
+                into 'dest'
+                duplicatesStrategy = 'include'
+            }
+        '''.stripIndent()
+
+        when:
+        run 'copy'
+
+        then:
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'f2'
+
+        when:
+        run 'copy'
+
+        then:
+        skipped(':copy')
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'f2'
+
+        when:
+        file('dir2/path/file.txt').text = 'new'
+        run 'copy'
+
+        then:
+        executedAndNotSkipped(':copy')
+        file('dest').assertHasDescendants('path/file.txt')
+        file('dest/path/file.txt').text == 'new'
     }
 
     def "renamed file can be treated as duplicate"() {
