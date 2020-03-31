@@ -1302,7 +1302,7 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
         )
     }
 
-    def 'matching is case sensitive by default'() {
+    def 'include and exclude patterns are case sensitive by default'() {
         given:
         file('files/sub/a.TXT').createFile()
         file('files/sub/b.txt').createFile()
@@ -1340,7 +1340,7 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
         file('dest').assertHasDescendants('sub/a.TXT', 'sub/Exclude/a.TXT', 'a.TXT')
     }
 
-    def 'matches case insensitive when enabled'() {
+    def 'include and exclude patterns are case insensitive when enabled'() {
         given:
         file('files/sub/a.TXT').createFile()
         file('files/sub/b.txt').createFile()
@@ -1369,6 +1369,7 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
         then:
         file('files/exclude/d.txt').createFile()
         skipped(':copy')
+        file('dest').assertHasDescendants('sub/a.TXT', 'sub/b.txt', 'sub/c.Txt')
 
         when:
         file('files/d.TXT').createFile()
