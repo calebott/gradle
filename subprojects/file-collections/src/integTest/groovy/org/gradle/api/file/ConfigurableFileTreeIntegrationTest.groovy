@@ -160,6 +160,7 @@ class ConfigurableFileTreeIntegrationTest extends AbstractIntegrationSpec {
             task copy(type: Copy) {
                 from filtered
                 into 'dest'
+                includeEmptyDirs = false
             }
         """
 

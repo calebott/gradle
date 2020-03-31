@@ -201,6 +201,7 @@ class FileTreeIntegrationTest extends AbstractIntegrationSpec {
             task copy(type: Copy) {
                 from files
                 into 'dest'
+                includeEmptyDirs = false
             }
         """
 

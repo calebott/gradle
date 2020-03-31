@@ -566,9 +566,13 @@ public class TestFile extends File {
      * Asserts that this is a directory and contains exactly the given set of descendant files and child directories. Ignores directories that are not empty.
      */
     public TestFile assertHasDescendants(Iterable<String> descendants) {
+        return assertHasDescendants(descendants, false);
+    }
+
+    public TestFile assertHasDescendants(Iterable<String> descendants, boolean ignoreDirs) {
         Set<String> actual = new TreeSet<String>();
         assertIsDir();
-        visit(actual, "", this);
+        visit(actual, "", this, ignoreDirs);
         Set<String> expected = new TreeSet<>(Lists.newArrayList(descendants));
 
         Set<String> extras = new TreeSet<>(actual);
@@ -587,7 +591,7 @@ public class TestFile extends File {
     public TestFile assertContainsDescendants(Iterable<String> descendants) {
         assertIsDir();
         Set<String> actual = new TreeSet<String>();
-        visit(actual, "", this);
+        visit(actual, "", this, false);
 
         Set<String> expected = new TreeSet<String>(Lists.newArrayList(descendants));
 
@@ -614,17 +618,17 @@ public class TestFile extends File {
     public Set<String> allDescendants() {
         Set<String> names = new TreeSet<String>();
         if (isDirectory()) {
-            visit(names, "", this);
+            visit(names, "", this, false);
         }
         return names;
     }
 
-    private void visit(Set<String> names, String prefix, File file) {
+    private void visit(Set<String> names, String prefix, File file, boolean ignoreDirs) {
         for (File child : file.listFiles()) {
-            if (child.isFile() || child.isDirectory() && child.list().length == 0) {
+            if (child.isFile() || !ignoreDirs && child.isDirectory() && child.list().length == 0) {
                 names.add(prefix + child.getName());
             } else if (child.isDirectory()) {
-                visit(names, prefix + child.getName() + "/", child);
+                visit(names, prefix + child.getName() + "/", child, ignoreDirs);
             }
         }
     }
