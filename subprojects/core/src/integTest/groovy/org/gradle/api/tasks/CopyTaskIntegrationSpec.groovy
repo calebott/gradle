@@ -30,6 +30,57 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
     @Rule
     public final TestResources resources = new TestResources(testDirectoryProvider, "copyTestResources")
 
+    def "copies everything by default"() {
+        given:
+        file("files/sub/a.txt").createFile()
+        file("files/sub/dir/b.txt").createFile()
+        file("files/c.txt").createFile()
+        file("files/sub/empty").createDir()
+        buildScript '''
+            task (copy, type:Copy) {
+               from 'files'
+               into 'dest'
+            }
+        '''.stripIndent()
+
+        when:
+        run 'copy'
+
+        then:
+        file('dest').assertHasDescendants(
+            'sub/a.txt',
+            'sub/dir/b.txt',
+            'c.txt',
+            'sub/empty'
+        )
+
+        when:
+        run 'copy'
+
+        then:
+        skipped(":copy")
+        file('dest').assertHasDescendants(
+            'sub/a.txt',
+            'sub/dir/b.txt',
+            'c.txt',
+            'sub/empty'
+        )
+
+        when:
+        file("files/sub/d.txt").createFile()
+        run 'copy'
+
+        then:
+        executedAndNotSkipped(":copy")
+        file('dest').assertHasDescendants(
+            'sub/a.txt',
+            'sub/dir/b.txt',
+            'sub/d.txt',
+            'c.txt',
+            'sub/empty'
+        )
+    }
+
     def "single source with include and exclude pattern"() {
         given:
         file("files/sub/a.txt").createFile()
@@ -882,7 +933,7 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
         '''
 
         when:
-        run'copy'
+        run 'copy'
 
         then:
         file('dest').assertHasDescendants(
@@ -1249,6 +1300,83 @@ class CopyTaskIntegrationSpec extends AbstractIntegrationSpec {
             'sub/onesub.renamed',
             'sub/onesub.a',
         )
+    }
+
+    def 'matching is case sensitive by default'() {
+        given:
+        file('files/sub/a.TXT').createFile()
+        file('files/sub/b.txt').createFile()
+        file('files/sub/c.Txt').createFile()
+        file('files/EXCLUDE/a.TXT').createFile()
+        file('files/sub/Exclude/a.TXT').createFile()
+        buildScript '''
+            task copy(type: Copy) {
+                from 'files'
+                into 'dest'
+                include '**/*.TXT'
+                exclude '**/EXCLUDE/**'
+            }
+        '''.stripIndent()
+
+        when:
+        run 'copy'
+
+        then:
+        file('dest').assertHasDescendants('sub/a.TXT', 'sub/Exclude/a.TXT')
+
+        when:
+        run 'copy'
+
+        then:
+        file('files/d.txt').createFile()
+        skipped(':copy')
+
+        when:
+        file('files/a.TXT').createFile()
+        run 'copy'
+
+        then:
+        executedAndNotSkipped(':copy')
+        file('dest').assertHasDescendants('sub/a.TXT', 'sub/Exclude/a.TXT', 'a.TXT')
+    }
+
+    def 'matches case insensitive when enabled'() {
+        given:
+        file('files/sub/a.TXT').createFile()
+        file('files/sub/b.txt').createFile()
+        file('files/sub/c.Txt').createFile()
+        file('files/EXCLUDE/a.TXT').createFile()
+        file('files/sub/Exclude/a.TXT').createFile()
+        buildScript '''
+            task copy(type: Copy) {
+                from 'files'
+                into 'dest'
+                include '**/*.TXT'
+                exclude '**/EXCLUDE/**'
+                caseSensitive = false
+            }
+        '''.stripIndent()
+
+        when:
+        run 'copy'
+
+        then:
+        file('dest').assertHasDescendants('sub/a.TXT', 'sub/b.txt', 'sub/c.Txt')
+
+        when:
+        run 'copy'
+
+        then:
+        file('files/exclude/d.txt').createFile()
+        skipped(':copy')
+
+        when:
+        file('files/d.TXT').createFile()
+        run 'copy'
+
+        then:
+        executedAndNotSkipped(':copy')
+        file('dest').assertHasDescendants('sub/a.TXT', 'sub/b.txt', 'sub/c.Txt', 'd.TXT')
     }
 
     def "empty directories are copied by default"() {
