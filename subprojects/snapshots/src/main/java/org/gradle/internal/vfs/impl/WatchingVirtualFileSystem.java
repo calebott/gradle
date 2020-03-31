@@ -109,7 +109,6 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
                     try {
                         if (nextEvent.lostState) {
                             LOGGER.warn("Dropped VFS state due to lost state");
-                            invalidateAll();
                             stopWatching();
                         } else {
                             FileWatcherRegistry.Type type = nextEvent.type;
@@ -139,7 +138,6 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while processing file events", e);
-                        invalidateAll();
                         stopWatching();
                     }
                 }
@@ -163,7 +161,6 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
             buildRunning = true;
         } else {
             stopWatching();
-            invalidateAll();
         }
     }
 
@@ -243,11 +240,9 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
         } catch (WatchingNotSupportedException ex) {
             // No stacktrace here, since this is a known shortcoming of our implementation
             LOGGER.warn("Watching not supported, not tracking changes between builds: {}", ex.getMessage());
-            invalidateAll();
             stopWatching();
         } catch (Exception ex) {
             LOGGER.error("Couldn't update watches, not watching anymore", ex);
-            invalidateAll();
             stopWatching();
         }
     }
@@ -269,6 +264,7 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
                 fileEvents.clear();
             }
         });
+        invalidateAll();
     }
 
     private void handleWatcherRegistryEvents(String eventsFor) {
@@ -281,7 +277,6 @@ public class WatchingVirtualFileSystem extends AbstractDelegatingVirtualFileSyst
             }
             if (statistics.getErrorWhileReceivingFileChanges().isPresent()) {
                 LOGGER.warn("Dropped VFS state due to error while receiving file changes", statistics.getErrorWhileReceivingFileChanges().get());
-                invalidateAll();
                 stopWatching();
             }
         });
